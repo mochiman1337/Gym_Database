@@ -1,111 +1,14 @@
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.sql.*;
 
 public class gymprogram {
 
     static int currentAccountId = 0;
-    static String currentUsername = "";
     static String currentEmployeeType = "";
 
     public static void main(String[] args) {
         Database.connect();
-        setupRoles();
         new SignIn();
-    }
-
-    static void setupRoles() {
-        try {
-            Statement statement = Database.connection.createStatement();
-            statement.executeUpdate("INSERT IGNORE INTO Role(role_name) VALUES('customer')");
-            statement.executeUpdate("INSERT IGNORE INTO Role(role_name) VALUES('employee')");
-            statement.executeUpdate("INSERT IGNORE INTO Role(role_name) VALUES('admin')");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    static int getRoleId(String roleName) {
-        try {
-            Statement statement = Database.connection.createStatement();
-            ResultSet rs = statement.executeQuery("SELECT role_id FROM Role WHERE role_name='" + roleName + "'");
-            if (rs.next()) {
-                return rs.getInt("role_id");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    static void giveAccountRole(int accountId, String roleName) {
-        try {
-            int roleId = getRoleId(roleName);
-            Statement statement = Database.connection.createStatement();
-            statement.executeUpdate("INSERT IGNORE INTO Account_Role(account_id, role_id) VALUES(" + accountId + "," + roleId + ")");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    static boolean hasRole(int accountId, String roleName) {
-        try {
-            Statement statement = Database.connection.createStatement();
-
-            String sql = "SELECT * FROM Account_Role ar JOIN Role r ON ar.role_id = r.role_id " +
-                    "WHERE ar.account_id = " + accountId + " AND r.role_name = '" + roleName + "'";
-
-            ResultSet rs = statement.executeQuery(sql);
-            return rs.next();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return false;
-    }
-
-    static void loadTable(JTable table, String sql) {
-        try {
-            Statement statement = Database.connection.createStatement();
-            ResultSet rs = statement.executeQuery(sql);
-            ResultSetMetaData metaData = rs.getMetaData();
-
-            DefaultTableModel model = new DefaultTableModel();
-            int columnCount = metaData.getColumnCount();
-
-            for (int i = 1; i <= columnCount; i++) {
-                model.addColumn(metaData.getColumnName(i));
-            }
-
-            while (rs.next()) {
-                Object[] row = new Object[columnCount];
-
-                for (int i = 1; i <= columnCount; i++) {
-                    row[i - 1] = rs.getObject(i);
-                }
-
-                model.addRow(row);
-            }
-
-            table.setModel(model);
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(null, "Table load error: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    static int getSelectedId(JTable table, int columnIndex) {
-        int row = table.getSelectedRow();
-
-        if (row == -1) {
-            JOptionPane.showMessageDialog(null, "Select a row first");
-            return 0;
-        }
-
-        Object value = table.getValueAt(row, columnIndex);
-        return Integer.parseInt(value.toString());
     }
 
     static class SignIn extends JFrame {
@@ -155,7 +58,7 @@ public class gymprogram {
                 try {
                     String username = usernameTF.getText();
                     String password = new String(passwordPF.getPassword());
-                    String type = typeCB.getSelectedItem().toString();
+                    String accountType = typeCB.getSelectedItem().toString();
 
                     Statement statement = Database.connection.createStatement();
 
@@ -166,30 +69,16 @@ public class gymprogram {
 
                     if (rs.next()) {
                         currentAccountId = rs.getInt("account_id");
-                        currentUsername = rs.getString("username");
                         currentEmployeeType = rs.getString("employee_type");
 
-                        if (type.equals("customer")) {
-                            if (hasRole(currentAccountId, "customer")) {
-                                dispose();
-                                new CustomerMenu();
-                            } else {
-                                JOptionPane.showMessageDialog(this, "This is not a customer account");
-                            }
-                        } else if (type.equals("employee")) {
-                            if (hasRole(currentAccountId, "employee") || currentEmployeeType != null) {
-                                dispose();
-                                new EmployeeMenu();
-                            } else {
-                                JOptionPane.showMessageDialog(this, "This is not an employee account");
-                            }
+                        dispose();
+
+                        if (accountType.equals("customer")) {
+                            new CustomerMenu();
+                        } else if (accountType.equals("employee")) {
+                            new EmployeeMenu();
                         } else {
-                            if (hasRole(currentAccountId, "admin") || username.equals("admin")) {
-                                dispose();
-                                new AdminMenu();
-                            } else {
-                                JOptionPane.showMessageDialog(this, "This is not an admin account");
-                            }
+                            new AdminMenu();
                         }
 
                     } else {
@@ -270,20 +159,14 @@ public class gymprogram {
                 try {
                     Statement statement = Database.connection.createStatement();
 
-                    String sql = "INSERT INTO Account(username, password, full_name, address, contact_info, employee_type) VALUES('"
+                    String sql = "INSERT INTO Account(username, password, full_name, address, contact_info) VALUES('"
                             + usernameTF.getText() + "','"
                             + new String(passwordPF.getPassword()) + "','"
                             + fullNameTF.getText() + "','"
                             + addressTF.getText() + "','"
-                            + contactTF.getText() + "', NULL)";
+                            + contactTF.getText() + "')";
 
                     statement.executeUpdate(sql);
-
-                    ResultSet rs = statement.executeQuery("SELECT account_id FROM Account WHERE username='" + usernameTF.getText() + "'");
-
-                    if (rs.next()) {
-                        giveAccountRole(rs.getInt("account_id"), "customer");
-                    }
 
                     JOptionPane.showMessageDialog(this, "Customer account created");
 
@@ -438,7 +321,14 @@ public class gymprogram {
             scrollPane.setBounds(250, 120, 700, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status='scheduled'");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status='scheduled'");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading classes: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton bookButton = new JButton("Book Selected Class");
             bookButton.setBounds(450, 470, 300, 40);
@@ -450,20 +340,22 @@ public class gymprogram {
 
             bookButton.addActionListener(e -> {
                 try {
-                    int classId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (classId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a class first");
+                    } else {
+                        int classId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+
+                        String sql = "INSERT INTO Class_Booking(account_id, class_id, booking_time) VALUES("
+                                + currentAccountId + "," + classId + ", NOW())";
+
+                        statement.executeUpdate(sql);
+
+                        JOptionPane.showMessageDialog(this, "Class booked");
                     }
-
-                    Statement statement = Database.connection.createStatement();
-
-                    String sql = "INSERT INTO Class_Booking(account_id, class_id, booking_time) VALUES("
-                            + currentAccountId + "," + classId + ", NOW())";
-
-                    statement.executeUpdate(sql);
-
-                    JOptionPane.showMessageDialog(this, "Class booked");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -492,7 +384,14 @@ public class gymprogram {
             scrollPane.setBounds(250, 100, 700, 200);
             add(scrollPane);
 
-            loadTable(trainerTable, "SELECT account_id, full_name, employee_type FROM Account WHERE employee_type='trainer'");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT account_id, full_name, employee_type FROM Account WHERE employee_type='trainer'");
+                trainerTable.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading trainers: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JLabel timeLabel = new JLabel("Appointment Time YYYY-MM-DD HH:MM:SS:");
             timeLabel.setBounds(320, 340, 250, 30);
@@ -512,21 +411,23 @@ public class gymprogram {
 
             requestButton.addActionListener(e -> {
                 try {
-                    int trainerId = getSelectedId(trainerTable, 0);
+                    int row = trainerTable.getSelectedRow();
 
-                    if (trainerId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a trainer first");
+                    } else {
+                        int trainerId = Integer.parseInt(trainerTable.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+
+                        String sql = "INSERT INTO Trainer_Appointment(customer_id, trainer_id, appointment_time, status) VALUES("
+                                + currentAccountId + "," + trainerId + ",'"
+                                + timeTF.getText() + "','pending')";
+
+                        statement.executeUpdate(sql);
+
+                        JOptionPane.showMessageDialog(this, "Appointment requested");
                     }
-
-                    Statement statement = Database.connection.createStatement();
-
-                    String sql = "INSERT INTO Trainer_Appointment(customer_id, trainer_id, appointment_time, status) VALUES("
-                            + currentAccountId + "," + trainerId + ",'"
-                            + timeTF.getText() + "','pending')";
-
-                    statement.executeUpdate(sql);
-
-                    JOptionPane.showMessageDialog(this, "Appointment requested");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -559,9 +460,14 @@ public class gymprogram {
             classScroll.setBounds(250, 120, 700, 200);
             add(classScroll);
 
-            loadTable(classTable, "SELECT cb.booking_id, fc.class_type, fc.class_time, fc.status " +
-                    "FROM Class_Booking cb JOIN Fitness_Class fc ON cb.class_id = fc.class_id " +
-                    "WHERE cb.account_id = " + currentAccountId);
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT cb.booking_id, fc.class_type, fc.class_time, fc.status FROM Class_Booking cb JOIN Fitness_Class fc ON cb.class_id=fc.class_id WHERE cb.account_id=" + currentAccountId);
+                classTable.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading class history: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JLabel trainerLabel = new JLabel("Trainer Appointment History");
             trainerLabel.setBounds(250, 340, 250, 30);
@@ -572,8 +478,14 @@ public class gymprogram {
             appointmentScroll.setBounds(250, 380, 700, 200);
             add(appointmentScroll);
 
-            loadTable(appointmentTable, "SELECT appointment_id, trainer_id, appointment_time, status " +
-                    "FROM Trainer_Appointment WHERE customer_id = " + currentAccountId);
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT appointment_id, trainer_id, appointment_time, status FROM Trainer_Appointment WHERE customer_id=" + currentAccountId);
+                appointmentTable.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading appointment history: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton backButton = new JButton("Back");
             backButton.setBounds(450, 620, 300, 40);
@@ -621,7 +533,7 @@ public class gymprogram {
 
             try {
                 Statement statement = Database.connection.createStatement();
-                ResultSet rs = statement.executeQuery("SELECT full_name, address, contact_info FROM Account WHERE account_id = " + currentAccountId);
+                ResultSet rs = statement.executeQuery("SELECT full_name, address, contact_info FROM Account WHERE account_id=" + currentAccountId);
 
                 if (rs.next()) {
                     nameTF.setText(rs.getString("full_name"));
@@ -645,10 +557,10 @@ public class gymprogram {
                 try {
                     Statement statement = Database.connection.createStatement();
 
-                    String sql = "UPDATE Account SET full_name = '" + nameTF.getText()
-                            + "', address = '" + addressTF.getText()
-                            + "', contact_info = '" + contactTF.getText()
-                            + "' WHERE account_id = " + currentAccountId;
+                    String sql = "UPDATE Account SET full_name='" + nameTF.getText()
+                            + "', address='" + addressTF.getText()
+                            + "', contact_info='" + contactTF.getText()
+                            + "' WHERE account_id=" + currentAccountId;
 
                     statement.executeUpdate(sql);
 
@@ -746,9 +658,14 @@ public class gymprogram {
             scrollPane.setBounds(120, 100, 950, 450);
             add(scrollPane);
 
-            loadTable(table, "SELECT a.account_id, a.username, a.full_name, a.address, a.contact_info, " +
-                    "m.membership_id, m.billing_cycle, m.status AS membership_status " +
-                    "FROM Account a LEFT JOIN Membership m ON a.account_id = m.account_id");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT a.account_id, a.username, a.full_name, a.address, a.contact_info, m.membership_id, m.billing_cycle, m.status AS membership_status FROM Account a LEFT JOIN Membership m ON a.account_id=m.account_id");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading members: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton backButton = new JButton("Back");
             backButton.setBounds(450, 600, 300, 40);
@@ -775,7 +692,14 @@ public class gymprogram {
             scrollPane.setBounds(250, 120, 700, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT membership_id, account_id, billing_cycle, start_date, status FROM Membership WHERE status = 'active'");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT membership_id, account_id, billing_cycle, start_date, status FROM Membership WHERE status='active'");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading memberships: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton cancelButton = new JButton("Cancel Membership");
             cancelButton.setBounds(450, 470, 300, 40);
@@ -787,18 +711,21 @@ public class gymprogram {
 
             cancelButton.addActionListener(e -> {
                 try {
-                    int membershipId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (membershipId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a membership first");
+                    } else {
+                        int membershipId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Membership SET status='cancelled' WHERE membership_id=" + membershipId);
+
+                        JOptionPane.showMessageDialog(this, "Membership cancelled");
+
+                        ResultSet rs = statement.executeQuery("SELECT membership_id, account_id, billing_cycle, start_date, status FROM Membership WHERE status='active'");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("UPDATE Membership SET status = 'cancelled' WHERE membership_id = " + membershipId);
-
-                    JOptionPane.showMessageDialog(this, "Membership cancelled");
-
-                    loadTable(table, "SELECT membership_id, account_id, billing_cycle, start_date, status FROM Membership WHERE status = 'active'");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -886,7 +813,14 @@ public class gymprogram {
             scrollPane.setBounds(250, 120, 700, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status = 'scheduled'");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status='scheduled'");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading classes: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton cancelButton = new JButton("Cancel Class");
             cancelButton.setBounds(450, 470, 300, 40);
@@ -898,18 +832,21 @@ public class gymprogram {
 
             cancelButton.addActionListener(e -> {
                 try {
-                    int classId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (classId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a class first");
+                    } else {
+                        int classId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Fitness_Class SET status='cancelled' WHERE class_id=" + classId);
+
+                        JOptionPane.showMessageDialog(this, "Class cancelled");
+
+                        ResultSet rs = statement.executeQuery("SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status='scheduled'");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("UPDATE Fitness_Class SET status = 'cancelled' WHERE class_id = " + classId);
-
-                    JOptionPane.showMessageDialog(this, "Class cancelled");
-
-                    loadTable(table, "SELECT class_id, coach_id, class_type, class_time, status FROM Fitness_Class WHERE status = 'scheduled'");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -938,8 +875,14 @@ public class gymprogram {
             scrollPane.setBounds(200, 120, 800, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT appointment_id, customer_id, trainer_id, appointment_time, status " +
-                    "FROM Trainer_Appointment WHERE trainer_id = " + currentAccountId);
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT appointment_id, customer_id, trainer_id, appointment_time, status FROM Trainer_Appointment WHERE trainer_id=" + currentAccountId);
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading appointments: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JButton acceptButton = new JButton("Accept");
             acceptButton.setBounds(250, 470, 160, 40);
@@ -957,9 +900,77 @@ public class gymprogram {
             backButton.setBounds(790, 470, 160, 40);
             add(backButton);
 
-            acceptButton.addActionListener(e -> updateAppointment(table, "accepted"));
-            declineButton.addActionListener(e -> updateAppointment(table, "declined"));
-            cancelButton.addActionListener(e -> updateAppointment(table, "cancelled"));
+            acceptButton.addActionListener(e -> {
+                try {
+                    int row = table.getSelectedRow();
+
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an appointment first");
+                    } else {
+                        int appointmentId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Trainer_Appointment SET status='accepted' WHERE appointment_id=" + appointmentId);
+
+                        JOptionPane.showMessageDialog(this, "Appointment accepted");
+
+                        ResultSet rs = statement.executeQuery("SELECT appointment_id, customer_id, trainer_id, appointment_time, status FROM Trainer_Appointment WHERE trainer_id=" + currentAccountId);
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+                    }
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
+            });
+
+            declineButton.addActionListener(e -> {
+                try {
+                    int row = table.getSelectedRow();
+
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an appointment first");
+                    } else {
+                        int appointmentId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Trainer_Appointment SET status='declined' WHERE appointment_id=" + appointmentId);
+
+                        JOptionPane.showMessageDialog(this, "Appointment declined");
+
+                        ResultSet rs = statement.executeQuery("SELECT appointment_id, customer_id, trainer_id, appointment_time, status FROM Trainer_Appointment WHERE trainer_id=" + currentAccountId);
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+                    }
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
+            });
+
+            cancelButton.addActionListener(e -> {
+                try {
+                    int row = table.getSelectedRow();
+
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an appointment first");
+                    } else {
+                        int appointmentId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Trainer_Appointment SET status='cancelled' WHERE appointment_id=" + appointmentId);
+
+                        JOptionPane.showMessageDialog(this, "Appointment cancelled");
+
+                        ResultSet rs = statement.executeQuery("SELECT appointment_id, customer_id, trainer_id, appointment_time, status FROM Trainer_Appointment WHERE trainer_id=" + currentAccountId);
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+                    }
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
+            });
 
             backButton.addActionListener(e -> {
                 dispose();
@@ -967,28 +978,6 @@ public class gymprogram {
             });
 
             setVisible(true);
-        }
-
-        void updateAppointment(JTable table, String status) {
-            try {
-                int appointmentId = getSelectedId(table, 0);
-
-                if (appointmentId == 0) {
-                    return;
-                }
-
-                Statement statement = Database.connection.createStatement();
-                statement.executeUpdate("UPDATE Trainer_Appointment SET status = '" + status + "' WHERE appointment_id = " + appointmentId);
-
-                JOptionPane.showMessageDialog(this, "Appointment " + status);
-
-                loadTable(table, "SELECT appointment_id, customer_id, trainer_id, appointment_time, status " +
-                        "FROM Trainer_Appointment WHERE trainer_id = " + currentAccountId);
-
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
-                ex.printStackTrace();
-            }
         }
     }
 
@@ -1116,12 +1105,6 @@ public class gymprogram {
 
                     statement.executeUpdate(sql);
 
-                    ResultSet rs = statement.executeQuery("SELECT account_id FROM Account WHERE username = '" + usernameTF.getText() + "'");
-
-                    if (rs.next()) {
-                        giveAccountRole(rs.getInt("account_id"), "employee");
-                    }
-
                     JOptionPane.showMessageDialog(this, "Employee account created");
 
                 } catch (Exception ex) {
@@ -1151,9 +1134,14 @@ public class gymprogram {
             scrollPane.setBounds(200, 100, 800, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT a.account_id, a.username, a.full_name, a.address, a.contact_info " +
-                    "FROM Account a JOIN Account_Role ar ON a.account_id = ar.account_id " +
-                    "JOIN Role r ON ar.role_id = r.role_id WHERE r.role_name = 'customer'");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, address, contact_info FROM Account WHERE employee_type IS NULL");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading customers: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JLabel nameLabel = new JLabel("New Full Name:");
             nameLabel.setBounds(300, 430, 120, 30);
@@ -1177,20 +1165,21 @@ public class gymprogram {
 
             modifyButton.addActionListener(e -> {
                 try {
-                    int accountId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (accountId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a customer first");
+                    } else {
+                        int accountId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Account SET full_name='" + nameTF.getText() + "' WHERE account_id=" + accountId);
+
+                        JOptionPane.showMessageDialog(this, "Customer modified");
+
+                        ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, address, contact_info FROM Account WHERE employee_type IS NULL");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("UPDATE Account SET full_name = '" + nameTF.getText() + "' WHERE account_id = " + accountId);
-
-                    JOptionPane.showMessageDialog(this, "Customer modified");
-
-                    loadTable(table, "SELECT a.account_id, a.username, a.full_name, a.address, a.contact_info " +
-                            "FROM Account a JOIN Account_Role ar ON a.account_id = ar.account_id " +
-                            "JOIN Role r ON ar.role_id = r.role_id WHERE r.role_name = 'customer'");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -1200,20 +1189,21 @@ public class gymprogram {
 
             deleteButton.addActionListener(e -> {
                 try {
-                    int accountId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (accountId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a customer first");
+                    } else {
+                        int accountId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("DELETE FROM Account WHERE account_id=" + accountId);
+
+                        JOptionPane.showMessageDialog(this, "Customer deleted");
+
+                        ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, address, contact_info FROM Account WHERE employee_type IS NULL");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("DELETE FROM Account WHERE account_id = " + accountId);
-
-                    JOptionPane.showMessageDialog(this, "Customer deleted");
-
-                    loadTable(table, "SELECT a.account_id, a.username, a.full_name, a.address, a.contact_info " +
-                            "FROM Account a JOIN Account_Role ar ON a.account_id = ar.account_id " +
-                            "JOIN Role r ON ar.role_id = r.role_id WHERE r.role_name = 'customer'");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -1242,7 +1232,14 @@ public class gymprogram {
             scrollPane.setBounds(200, 100, 800, 300);
             add(scrollPane);
 
-            loadTable(table, "SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading employees: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JLabel nameLabel = new JLabel("New Full Name:");
             nameLabel.setBounds(300, 430, 120, 30);
@@ -1266,18 +1263,21 @@ public class gymprogram {
 
             modifyButton.addActionListener(e -> {
                 try {
-                    int accountId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (accountId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an employee first");
+                    } else {
+                        int accountId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("UPDATE Account SET full_name='" + nameTF.getText() + "' WHERE account_id=" + accountId);
+
+                        JOptionPane.showMessageDialog(this, "Employee modified");
+
+                        ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("UPDATE Account SET full_name = '" + nameTF.getText() + "' WHERE account_id = " + accountId);
-
-                    JOptionPane.showMessageDialog(this, "Employee modified");
-
-                    loadTable(table, "SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -1287,18 +1287,21 @@ public class gymprogram {
 
             deleteButton.addActionListener(e -> {
                 try {
-                    int accountId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (accountId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an employee first");
+                    } else {
+                        int accountId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("DELETE FROM Account WHERE account_id=" + accountId);
+
+                        JOptionPane.showMessageDialog(this, "Employee deleted");
+
+                        ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("DELETE FROM Account WHERE account_id = " + accountId);
-
-                    JOptionPane.showMessageDialog(this, "Employee deleted");
-
-                    loadTable(table, "SELECT account_id, username, full_name, employee_type FROM Account WHERE employee_type IS NOT NULL");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -1350,37 +1353,49 @@ public class gymprogram {
             add(backButton);
 
             loadButton.addActionListener(e -> {
-                String tableName = dataTypeCB.getSelectedItem().toString();
-                loadTable(table, "SELECT * FROM " + tableName);
+                try {
+                    String tableName = dataTypeCB.getSelectedItem().toString();
+
+                    Statement statement = Database.connection.createStatement();
+                    ResultSet rs = statement.executeQuery("SELECT * FROM " + tableName);
+
+                    table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+                    ex.printStackTrace();
+                }
             });
 
             deleteButton.addActionListener(e -> {
                 try {
                     String tableName = dataTypeCB.getSelectedItem().toString();
-                    int selectedId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (selectedId == 0) {
-                        return;
-                    }
-
-                    String idColumn = "";
-
-                    if (tableName.equals("Membership")) {
-                        idColumn = "membership_id";
-                    } else if (tableName.equals("Fitness_Class")) {
-                        idColumn = "class_id";
-                    } else if (tableName.equals("Class_Booking")) {
-                        idColumn = "booking_id";
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select a row first");
                     } else {
-                        idColumn = "appointment_id";
+                        int selectedId = Integer.parseInt(table.getValueAt(row, 0).toString());
+                        String idColumn;
+
+                        if (tableName.equals("Membership")) {
+                            idColumn = "membership_id";
+                        } else if (tableName.equals("Fitness_Class")) {
+                            idColumn = "class_id";
+                        } else if (tableName.equals("Class_Booking")) {
+                            idColumn = "booking_id";
+                        } else {
+                            idColumn = "appointment_id";
+                        }
+
+                        Statement statement = Database.connection.createStatement();
+                        statement.executeUpdate("DELETE FROM " + tableName + " WHERE " + idColumn + "=" + selectedId);
+
+                        JOptionPane.showMessageDialog(this, "Selected record deleted");
+
+                        ResultSet rs = statement.executeQuery("SELECT * FROM " + tableName);
+                        table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
                     }
-
-                    Statement statement = Database.connection.createStatement();
-                    statement.executeUpdate("DELETE FROM " + tableName + " WHERE " + idColumn + " = " + selectedId);
-
-                    JOptionPane.showMessageDialog(this, "Selected record deleted");
-
-                    loadTable(table, "SELECT * FROM " + tableName);
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -1409,7 +1424,14 @@ public class gymprogram {
             scrollPane.setBounds(250, 100, 700, 250);
             add(scrollPane);
 
-            loadTable(table, "SELECT account_id, username, full_name, employee_type FROM Account");
+            try {
+                Statement statement = Database.connection.createStatement();
+                ResultSet rs = statement.executeQuery("SELECT account_id, username, full_name, employee_type FROM Account");
+                table.setModel(net.proteanit.sql.DbUtils.resultSetToTableModel(rs));
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error loading accounts: " + ex.getMessage());
+                ex.printStackTrace();
+            }
 
             JLabel passLabel = new JLabel("New Password:");
             passLabel.setBounds(400, 390, 120, 30);
@@ -1429,18 +1451,20 @@ public class gymprogram {
 
             resetButton.addActionListener(e -> {
                 try {
-                    int accountId = getSelectedId(table, 0);
+                    int row = table.getSelectedRow();
 
-                    if (accountId == 0) {
-                        return;
+                    if (row == -1) {
+                        JOptionPane.showMessageDialog(this, "Select an account first");
+                    } else {
+                        int accountId = Integer.parseInt(table.getValueAt(row, 0).toString());
+
+                        Statement statement = Database.connection.createStatement();
+
+                        statement.executeUpdate("UPDATE Account SET password='" +
+                                new String(passPF.getPassword()) + "' WHERE account_id=" + accountId);
+
+                        JOptionPane.showMessageDialog(this, "Password reset");
                     }
-
-                    Statement statement = Database.connection.createStatement();
-
-                    statement.executeUpdate("UPDATE Account SET password = '" +
-                            new String(passPF.getPassword()) + "' WHERE account_id = " + accountId);
-
-                    JOptionPane.showMessageDialog(this, "Password reset");
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
