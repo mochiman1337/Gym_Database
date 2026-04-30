@@ -88,5 +88,7 @@ GRANT SELECT, INSERT ON gym_db.* TO 'customer'@'%';
 GRANT SELECT, INSERT, UPDATE ON gym_db.* TO 'employee'@'%';
 GRANT ALL PRIVILEGES ON gym_db.* TO 'admin'@'%';
 
+INSERT INTO Account (username, password, full_name, employee_type)
+VALUES ('admin1', 'admin123', 'Admin User', NULL);
 
 
