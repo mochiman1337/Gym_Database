@@ -68,7 +68,6 @@ public class gymprogram {
 
       JButton createButton = new JButton("Create Customer Account");
 
-// 👇 full width + centered like title
       createButton.setBounds(0, 460, 1200, 40);
       createButton.setHorizontalAlignment(SwingConstants.CENTER);
 
