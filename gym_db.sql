@@ -7,13 +7,17 @@ CREATE TABLE Account (
     full_name VARCHAR(100) NOT NULL,
     address VARCHAR(255),
     contact_info VARCHAR(100),
-    employee_type ENUM('receptionist', 'fitness_coach', 'trainer'),
+
+    require_password_reset BOOLEAN DEFAULT FALSE,
+
     PRIMARY KEY (account_id)
 );
 
 CREATE TABLE Role (
     role_id INT NOT NULL AUTO_INCREMENT,
-    role_name ENUM('customer', 'employee', 'admin') NOT NULL,
+
+    role_name VARCHAR(50) NOT NULL UNIQUE,
+
     PRIMARY KEY (role_id)
 );
 
@@ -52,7 +56,9 @@ CREATE TABLE Membership (
 CREATE TABLE Fitness_Class (
     class_id INT NOT NULL AUTO_INCREMENT,
     coach_id INT NOT NULL,
-    class_type ENUM('yoga', 'cardio', 'strength', 'pilates', 'crossfit') NOT NULL,
+
+    class_type VARCHAR(100) NOT NULL,
+
     class_time DATETIME NOT NULL,
     status ENUM('scheduled', 'cancelled', 'completed') NOT NULL,
     PRIMARY KEY (class_id),
