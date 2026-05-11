@@ -3,11 +3,12 @@ import javax.swing.table.DefaultTableModel;
 import java.util.List;
 
 public class CustomerDashboard {
+    // Make sure the names MATCH! creates errors
     private JPanel customerPanel;
-    private JTabbedPane classScheduleTab; // FIXED: Missing binding
-    private JPanel classSchedule;        // FIXED: Missing binding
-    private JPanel myBookings;           // FIXED: Missing binding
-    private JPanel myProfile;            // FIXED: Missing binding
+    private JTabbedPane classScheduleTab;
+    private JPanel classSchedule;
+    private JPanel myBookings;
+    private JPanel myProfile;
 
     private JTable scheduleTable, historyTable;
     private JButton bookButton, cancelBookingButton, saveProfileButton, logoutButton;

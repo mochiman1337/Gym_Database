@@ -14,7 +14,8 @@ public class Login {
 
     public interface LoginListener {
         void onLoginSuccess(UserSession session);
-        void onNavigateToRegister(); // New navigation method
+
+        void onNavigateToRegister();
     }
 
     public Login(LoginListener listener) {
@@ -28,7 +29,7 @@ public class Login {
             }
         });
 
-        // Trigger navigation to the Register screen
+        // Go to Register screen
         createLogin.addActionListener(e -> listener.onNavigateToRegister());
     }
 

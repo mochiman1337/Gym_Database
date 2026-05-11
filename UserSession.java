@@ -27,7 +27,8 @@ public class UserSession {
     public void setRoles(List<String> roles) { this.roles = roles; }
     public void setPermissions(List<String> permissions) { this.permissions = permissions; }
 
-    // RBAC Checkers (Used by your GUI to show/hide buttons)
+    // RBAC Checkers: This shows and hides buttons for specific users/roles
+    // Idea, advice help for implementation through outside
     public boolean hasRole(String roleName) {
         return roles.contains(roleName);
     }
