@@ -2,7 +2,6 @@ import javax.swing.*;
 import java.awt.*;
 
 public class MainAppFrame extends JFrame {
-
     private CardLayout cardLayout;
     private JPanel mainPanel;
 
@@ -12,50 +11,50 @@ public class MainAppFrame extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Initialize the CardLayout container
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
-        // 1. Build the REAL Login Panel from your IntelliJ .form
+        // 1. Setup Login Screen
         Login loginScreen = new Login(new Login.LoginListener() {
             @Override
             public void onLoginSuccess(UserSession session) {
-                // When login succeeds, pass the session to the router
                 handleLoginRouting(session);
+            }
+
+            @Override
+            public void onNavigateToRegister() {
+                cardLayout.show(mainPanel, "REGISTER"); // Swap to Register card
             }
         });
 
-        // Add the login screen to the card layout
+        // 2. Setup Register Screen
+        Register registerScreen = new Register(new Register.RegisterListener() {
+            @Override
+            public void onRegistrationComplete() {
+                cardLayout.show(mainPanel, "LOGIN"); // Back to login after success
+            }
+
+            @Override
+            public void onCancel() {
+                cardLayout.show(mainPanel, "LOGIN"); // Back to login on cancel
+            }
+        });
+
         mainPanel.add(loginScreen.getPanel(), "LOGIN");
+        mainPanel.add(registerScreen.getPanel(), "REGISTER");
 
         add(mainPanel);
-
-        // Start by showing the login screen
         cardLayout.show(mainPanel, "LOGIN");
     }
 
-    /**
-     * THE CONTROLLER: This decides where the user goes AFTER logging in.
-     */
     private void handleLoginRouting(UserSession session) {
-
-        // Check if they are ONLY a Customer (Note: getRoles() is used because roles is private)
         if (session.hasRole("CUSTOMER") && session.getRoles().size() == 1) {
-
-            // Generate the Customer Dashboard WITH the real session data
             CustomerDashboard customerDash = new CustomerDashboard(session);
             mainPanel.add(customerDash.getPanel(), "CUSTOMER");
-
-            // Switch the screen
             cardLayout.show(mainPanel, "CUSTOMER");
-
         } else {
-
-            // Generate the Employee Dashboard WITH the real session data
             EmployeeDashboard employeeDash = new EmployeeDashboard(session);
             mainPanel.add(employeeDash.getPanel(), "EMPLOYEE");
-
-            // Switch the screen
             cardLayout.show(mainPanel, "EMPLOYEE");
         }
     }

@@ -1,5 +1,6 @@
 CREATE DATABASE gym_db;
 USE gym_db;
+
 CREATE TABLE Account (
     account_id INT NOT NULL AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -94,7 +95,7 @@ GRANT SELECT, INSERT ON gym_db.* TO 'customer'@'%';
 GRANT SELECT, INSERT, UPDATE ON gym_db.* TO 'employee'@'%';
 GRANT ALL PRIVILEGES ON gym_db.* TO 'admin'@'%';
 
-INSERT INTO Account (username, password, full_name, employee_type)
-VALUES ('admin1', 'admin123', 'Admin User', NULL);
+INSERT INTO Account (username, password, full_name, require_password_reset)
+VALUES ('admin1', 'admin123', 'Admin User', FALSE);
 
 
