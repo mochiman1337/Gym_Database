@@ -11,7 +11,6 @@ public class Register {
 
     public interface RegisterListener {
         void onRegistrationComplete();
-
         void onCancel();
     }
 
@@ -19,8 +18,6 @@ public class Register {
         this.listener = listener;
         this.dbManager = new DatabaseManager();
 
-        // Group radio buttons so only one can be selected
-        // Advice given by outside help & Google
         ButtonGroup group = new ButtonGroup();
         group.add(monthlyButton);
         group.add(yearlyButton);
@@ -43,11 +40,7 @@ public class Register {
             return;
         }
 
-        // Create the Account (Role 1 = CUSTOMER)
-        // Make sure creating is only CUSTOMERS, all else is done via ADMIN
         if (dbManager.createUser(username, password, fullName, 1)) {
-
-            // Gets ID and also the Membership selected
             UserSession temp = dbManager.authenticate(username, password);
             if (temp != null) {
                 dbManager.updateCustomerProfile(temp.getAccountId(), fullName, address, contact);
@@ -60,7 +53,5 @@ public class Register {
         }
     }
 
-    public JPanel getPanel() {
-        return registerPanel;
-    }
+    public JPanel getPanel() { return registerPanel; }
 }

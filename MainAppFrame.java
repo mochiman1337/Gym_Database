@@ -14,30 +14,14 @@ public class MainAppFrame extends JFrame {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
-        // Log-in Screen
         Login loginScreen = new Login(new Login.LoginListener() {
-            @Override
-            public void onLoginSuccess(UserSession session) {
-                handleLoginRouting(session);
-            }
-
-            @Override
-            public void onNavigateToRegister() {
-                cardLayout.show(mainPanel, "REGISTER");
-            }
+            @Override public void onLoginSuccess(UserSession session) { handleLoginRouting(session); }
+            @Override public void onNavigateToRegister() { cardLayout.show(mainPanel, "REGISTER"); }
         });
 
-        // Register Screen: Creating new user
         Register registerScreen = new Register(new Register.RegisterListener() {
-            @Override
-            public void onRegistrationComplete() {
-                cardLayout.show(mainPanel, "LOGIN"); // Returns to Login after creation
-            }
-
-            @Override
-            public void onCancel() {
-                cardLayout.show(mainPanel, "LOGIN"); // Returns to Login Page
-            }
+            @Override public void onRegistrationComplete() { cardLayout.show(mainPanel, "LOGIN"); }
+            @Override public void onCancel() { cardLayout.show(mainPanel, "LOGIN"); }
         });
 
         mainPanel.add(loginScreen.getPanel(), "LOGIN");

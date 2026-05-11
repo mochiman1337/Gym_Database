@@ -8,10 +8,11 @@ public class EmployeeDashboard {
     private JPanel employeePanel;
     private JLabel welcomeLabel;
     private JTabbedPane employeeTabs;
-    private JPanel scheduleTab, membersTab;
-    private JTable masterScheduleTable, membersTable;
+    private JPanel scheduleTab, membersTab, appointmentsTab;
+    private JTable masterScheduleTable, membersTable, appointmentsTable;
     private JButton createClassButton, cancelClassButton, cancelMembershipButton;
     private JButton resetPasswordButton, logoutButton, createUserButton, deleteUserButton;
+    private JButton acceptApptButton, declineApptButton, viewMemberDetailsButton;
     private JTextField memberSearchField;
 
     private UserSession session;
@@ -21,126 +22,146 @@ public class EmployeeDashboard {
     public EmployeeDashboard(UserSession session) {
         this.session = session;
         this.dbManager = new DatabaseManager();
-
         welcomeLabel.setText("Employee Portal - Logged in as: " + session.getFullName());
 
         applyRBACPermissions();
-        loadMasterSchedule();
-        loadMembersList();
-        setupMemberFilter();
 
-        createUserButton.addActionListener(e -> showRegisterUserDialog());
-        deleteUserButton.addActionListener(e -> handleDeleteUser());
-        cancelMembershipButton.addActionListener(e -> handleCancelMembership());
+        if (session.hasPermission("CREATE_EVENT") || session.hasPermission("FULL_ACCESS")) loadMasterSchedule();
+        if (session.hasPermission("MANAGE_MEMBERSHIPS") || session.hasPermission("FULL_ACCESS")) { loadMembersList(); setupMemberFilter(); }
+        if (session.hasPermission("MANAGE_APPOINTMENTS") || session.hasPermission("FULL_ACCESS")) loadAppointments();
+
+        if (createUserButton != null) createUserButton.addActionListener(e -> showRegisterUserDialog());
+        if (deleteUserButton != null) deleteUserButton.addActionListener(e -> handleDeleteUser());
+        if (cancelMembershipButton != null) cancelMembershipButton.addActionListener(e -> handleCancelMembership());
+        if (resetPasswordButton != null) resetPasswordButton.addActionListener(e -> handleForceReset());
+        if (viewMemberDetailsButton != null) viewMemberDetailsButton.addActionListener(e -> handleViewDetails());
+        if (acceptApptButton != null) acceptApptButton.addActionListener(e -> handleAppointmentStatus("accepted"));
+        if (declineApptButton != null) declineApptButton.addActionListener(e -> handleAppointmentStatus("declined"));
+
         logoutButton.addActionListener(e -> {
             SwingUtilities.getWindowAncestor(getPanel()).dispose();
             new MainAppFrame().setVisible(true);
         });
     }
 
+    private void handleForceReset() {
+        int r = membersTable.getSelectedRow();
+        if (r != -1) {
+            String user = (String) membersTable.getModel().getValueAt(membersTable.convertRowIndexToModel(r), 1);
+            if (dbManager.flagForPasswordReset(user)) JOptionPane.showMessageDialog(employeePanel, "User flagged for reset.");
+        }
+    }
+
+    private void handleViewDetails() {
+        int r = membersTable.getSelectedRow();
+        if (r != -1) {
+            int modelRow = membersTable.convertRowIndexToModel(r);
+            int id = Integer.parseInt((String) membersTable.getModel().getValueAt(modelRow, 0));
+            String name = (String) membersTable.getModel().getValueAt(modelRow, 2);
+            JTable detailsTable = new JTable(new DefaultTableModel(dbManager.getMemberDetails(id).toArray(new String[0][]), new String[]{"Type", "Event Info", "Time", "Status"}));
+            JOptionPane.showMessageDialog(employeePanel, new JScrollPane(detailsTable), "History for " + name, JOptionPane.PLAIN_MESSAGE);
+        }
+    }
+
+    private void handleAppointmentStatus(String newStatus) {
+        int r = appointmentsTable.getSelectedRow();
+        if (r != -1) {
+            int appId = Integer.parseInt((String) appointmentsTable.getValueAt(r, 0));
+            if (dbManager.updateAppointmentStatus(appId, newStatus)) {
+                JOptionPane.showMessageDialog(employeePanel, "Appointment " + newStatus + ".");
+                loadAppointments();
+            }
+        }
+    }
+
     private void setupMemberFilter() {
+        if (membersTable == null || membersTable.getModel() == null) return;
         memberSorter = new TableRowSorter<>((DefaultTableModel) membersTable.getModel());
         membersTable.setRowSorter(memberSorter);
         memberSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                filter();
-            }
-
-            public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                filter();
-            }
-
-            public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                filter();
-            }
-
-            private void filter() {
-                String t = memberSearchField.getText();
-                memberSorter.setRowFilter(t.trim().isEmpty() ? null : RowFilter.regexFilter("(?i)" + t));
-            }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
+            private void filter() { memberSorter.setRowFilter(memberSearchField.getText().trim().isEmpty() ? null : RowFilter.regexFilter("(?i)" + memberSearchField.getText())); }
         });
     }
 
     private void applyRBACPermissions() {
-        boolean canSch = session.hasPermission("CREATE_EVENT") || session.hasPermission("FULL_ACCESS");
-        boolean isStaffOrAdmin = session.hasPermission("MANAGE_MEMBERSHIPS") || session.hasPermission("FULL_ACCESS");
+        boolean isSch = session.hasPermission("CREATE_EVENT") || session.hasPermission("FULL_ACCESS");
+        boolean isStaff = session.hasPermission("MANAGE_MEMBERSHIPS") || session.hasPermission("FULL_ACCESS");
+        boolean isTrainer = session.hasPermission("MANAGE_APPOINTMENTS") || session.hasPermission("FULL_ACCESS");
         boolean isAdm = session.hasPermission("FULL_ACCESS");
 
-        createClassButton.setVisible(canSch);
-        cancelClassButton.setVisible(canSch);
-        cancelMembershipButton.setVisible(isStaffOrAdmin);
-        resetPasswordButton.setVisible(isAdm);
-        deleteUserButton.setVisible(isAdm);
-        createUserButton.setVisible(isAdm);
-        if (!canSch) employeeTabs.remove(scheduleTab);
+        if (createClassButton != null) createClassButton.setVisible(isSch);
+        if (cancelClassButton != null) cancelClassButton.setVisible(isSch);
+        if (cancelMembershipButton != null) cancelMembershipButton.setVisible(isStaff);
+        if (viewMemberDetailsButton != null) viewMemberDetailsButton.setVisible(isStaff);
+        if (acceptApptButton != null) acceptApptButton.setVisible(isTrainer);
+        if (declineApptButton != null) declineApptButton.setVisible(isTrainer);
+        if (resetPasswordButton != null) resetPasswordButton.setVisible(isAdm);
+        if (deleteUserButton != null) deleteUserButton.setVisible(isAdm);
+        if (createUserButton != null) createUserButton.setVisible(isAdm);
+
+        if (!isSch && scheduleTab != null) employeeTabs.remove(scheduleTab);
+        if (!isStaff && membersTab != null) employeeTabs.remove(membersTab);
+        if (!isTrainer && appointmentsTab != null) employeeTabs.remove(appointmentsTab);
+    }
+
+    private void loadAppointments() {
+        if (appointmentsTable == null) return;
+        appointmentsTable.setModel(new DefaultTableModel(dbManager.getStaffAppointments(session.getAccountId(), session.hasRole("ADMIN")).toArray(new String[0][]), new String[]{"Appt ID", "Customer", "Time", "Status"}) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        });
     }
 
     private void loadMembersList() {
-        // Headers MUST match EXACTLY!: ID, Username, Name, Roles, Status
-        String[] headers = {"ID", "Username", "Name", "Roles", "Status"};
-        List<String[]> data = dbManager.getAllAccountsWithRoles();
-
-        DefaultTableModel model = new DefaultTableModel(data.toArray(new String[0][]), headers) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
-        };
-
-        membersTable.setModel(model);
-        if (memberSorter != null) memberSorter.setModel(model);
+        if (membersTable == null) return;
+        membersTable.setModel(new DefaultTableModel(dbManager.getAllAccountsWithRoles().toArray(new String[0][]), new String[]{"ID", "Username", "Name", "Roles", "Status"}) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        });
+        if (memberSorter != null) memberSorter.setModel((DefaultTableModel) membersTable.getModel());
     }
 
     private void handleCancelMembership() {
         int r = membersTable.getSelectedRow();
         if (r != -1) {
-            int modelRow = membersTable.convertRowIndexToModel(r);
-            int id = Integer.parseInt((String) membersTable.getModel().getValueAt(modelRow, 0));
-            if (dbManager.cancelCustomerMembership(id)) {
-                JOptionPane.showMessageDialog(employeePanel, "Membership status: Cancelled.");
-                loadMembersList();
-            }
+            int id = Integer.parseInt((String) membersTable.getModel().getValueAt(membersTable.convertRowIndexToModel(r), 0));
+            if (dbManager.cancelCustomerMembership(id)) loadMembersList();
         }
     }
 
     private void showRegisterUserDialog() {
         JPanel p = new JPanel(new GridLayout(4, 2, 5, 5));
         JTextField u = new JTextField(), ps = new JTextField(), n = new JTextField();
-        JComboBox<String> r = new JComboBox<>(new String[]{"CUSTOMER (1)", "EMPLOYEE (2)", "ADMIN (3)"});
-        p.add(new JLabel("Username:"));
-        p.add(u);
-        p.add(new JLabel("Password:"));
-        p.add(ps);
-        p.add(new JLabel("Full Name:"));
-        p.add(n);
-        p.add(new JLabel("Role:"));
-        p.add(r);
+        JComboBox<String> r = new JComboBox<>(new String[]{"CUSTOMER", "EMPLOYEE", "ADMIN", "COACH", "TRAINER"});
+        p.add(new JLabel("Username:")); p.add(u); p.add(new JLabel("Password:")); p.add(ps);
+        p.add(new JLabel("Full Name:")); p.add(n); p.add(new JLabel("Role:")); p.add(r);
+
         if (JOptionPane.showConfirmDialog(employeePanel, p, "Register", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            if (dbManager.createUser(u.getText(), ps.getText(), n.getText(), r.getSelectedIndex() + 1))
+            // Arrays mapping Combobox index directly to Database ID
+            int[] roleIds = {1, 2, 3, 4, 5};
+            if (dbManager.createUser(u.getText(), ps.getText(), n.getText(), roleIds[r.getSelectedIndex()])) {
                 loadMembersList();
+            } else {
+                JOptionPane.showMessageDialog(employeePanel, "Creation failed. Username taken.");
+            }
         }
     }
 
     private void handleDeleteUser() {
         int r = membersTable.getSelectedRow();
         if (r != -1) {
-            int modelRow = membersTable.convertRowIndexToModel(r);
-            int id = Integer.parseInt((String) membersTable.getModel().getValueAt(modelRow, 0));
+            int id = Integer.parseInt((String) membersTable.getModel().getValueAt(membersTable.convertRowIndexToModel(r), 0));
             if (id != session.getAccountId() && dbManager.deleteUser(id)) loadMembersList();
         }
     }
 
     private void loadMasterSchedule() {
-        String[] h = {"ID", "Coach", "Type", "Name", "Time"};
-        masterScheduleTable.setModel(new DefaultTableModel(dbManager.getAllClasses().toArray(new String[0][]), h) {
-            @Override
-            public boolean isCellEditable(int r, int c) {
-                return false;
-            }
+        if (masterScheduleTable == null) return;
+        masterScheduleTable.setModel(new DefaultTableModel(dbManager.getAllClasses().toArray(new String[0][]), new String[]{"ID", "Coach ID", "Type", "Name", "Time"}) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         });
     }
 
-    public JPanel getPanel() {
-        return employeePanel;
-    }
+    public JPanel getPanel() { return employeePanel; }
 }
