@@ -18,16 +18,43 @@ public class UserSession {
         this.permissions = new ArrayList<>();
     }
 
-    public int getAccountId() { return accountId; }
-    public String getUsername() { return username; }
-    public String getFullName() { return fullName; }
-    public boolean isRequiresPasswordReset() { return requiresPasswordReset; }
-    public List<String> getRoles() { return roles; }
-    public List<String> getPermissions() { return permissions; }
+    public int getAccountId() {
+        return accountId;
+    }
 
-    public void setRoles(List<String> roles) { this.roles = roles; }
-    public void setPermissions(List<String> permissions) { this.permissions = permissions; }
+    public String getUsername() {
+        return username;
+    }
 
-    public boolean hasRole(String roleName) { return roles.contains(roleName); }
-    public boolean hasPermission(String permissionName) { return permissions.contains(permissionName); }
+    public String getFullName() {
+        return fullName;
+    }
+
+    public boolean isRequiresPasswordReset() {
+        return requiresPasswordReset;
+    }
+
+    public List<String> getRoles() {
+        return roles;
+    }
+
+    public List<String> getPermissions() {
+        return permissions;
+    }
+
+    public void setRoles(List<String> roles) {
+        this.roles = roles;
+    }
+
+    public void setPermissions(List<String> permissions) {
+        this.permissions = permissions;
+    }
+
+    public boolean hasRole(String roleName) {
+        return roles.contains(roleName);
+    }
+
+    public boolean hasPermission(String permissionName) {
+        return permissions.contains(permissionName);
+    }
 }

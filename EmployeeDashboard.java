@@ -27,9 +27,14 @@ public class EmployeeDashboard {
         applyRBACPermissions();
 
         if (session.hasPermission("CREATE_EVENT") || session.hasPermission("FULL_ACCESS")) loadMasterSchedule();
-        if (session.hasPermission("MANAGE_MEMBERSHIPS") || session.hasPermission("FULL_ACCESS")) { loadMembersList(); setupMemberFilter(); }
+        if (session.hasPermission("MANAGE_MEMBERSHIPS") || session.hasPermission("FULL_ACCESS")) {
+            loadMembersList();
+            setupMemberFilter();
+        }
         if (session.hasPermission("MANAGE_APPOINTMENTS") || session.hasPermission("FULL_ACCESS")) loadAppointments();
 
+        if (createClassButton != null) createClassButton.addActionListener(e -> showCreateClassDialog());
+        if (cancelClassButton != null) cancelClassButton.addActionListener(e -> handleCancelClass());
         if (createUserButton != null) createUserButton.addActionListener(e -> showRegisterUserDialog());
         if (deleteUserButton != null) deleteUserButton.addActionListener(e -> handleDeleteUser());
         if (cancelMembershipButton != null) cancelMembershipButton.addActionListener(e -> handleCancelMembership());
@@ -44,11 +49,44 @@ public class EmployeeDashboard {
         });
     }
 
+    private void showCreateClassDialog() {
+        JPanel p = new JPanel(new GridLayout(3, 2, 5, 5));
+        JTextField type = new JTextField();
+        JTextField time = new JTextField("2026-06-01 18:00:00");
+        p.add(new JLabel("Class Name:"));
+        p.add(type);
+        p.add(new JLabel("Time (YYYY-MM-DD HH:MM:SS):"));
+        p.add(time);
+
+        if (JOptionPane.showConfirmDialog(employeePanel, p, "Schedule New Class", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            if (dbManager.createClass(session.getAccountId(), type.getText().trim(), time.getText().trim())) {
+                JOptionPane.showMessageDialog(employeePanel, "Class Scheduled!");
+                loadMasterSchedule();
+            } else {
+                JOptionPane.showMessageDialog(employeePanel, "Error scheduling class. Check format.");
+            }
+        }
+    }
+
+    private void handleCancelClass() {
+        int r = masterScheduleTable.getSelectedRow();
+        if (r != -1) {
+            int classId = Integer.parseInt((String) masterScheduleTable.getValueAt(r, 0));
+            if (dbManager.cancelClass(classId)) {
+                JOptionPane.showMessageDialog(employeePanel, "Class Cancelled.");
+                loadMasterSchedule();
+            }
+        } else {
+            JOptionPane.showMessageDialog(employeePanel, "Select a class to cancel.");
+        }
+    }
+
     private void handleForceReset() {
         int r = membersTable.getSelectedRow();
         if (r != -1) {
             String user = (String) membersTable.getModel().getValueAt(membersTable.convertRowIndexToModel(r), 1);
-            if (dbManager.flagForPasswordReset(user)) JOptionPane.showMessageDialog(employeePanel, "User flagged for reset.");
+            if (dbManager.flagForPasswordReset(user))
+                JOptionPane.showMessageDialog(employeePanel, "User flagged for reset.");
         }
     }
 
@@ -79,10 +117,21 @@ public class EmployeeDashboard {
         memberSorter = new TableRowSorter<>((DefaultTableModel) membersTable.getModel());
         membersTable.setRowSorter(memberSorter);
         memberSearchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            public void insertUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            public void removeUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            public void changedUpdate(javax.swing.event.DocumentEvent e) { filter(); }
-            private void filter() { memberSorter.setRowFilter(memberSearchField.getText().trim().isEmpty() ? null : RowFilter.regexFilter("(?i)" + memberSearchField.getText())); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                filter();
+            }
+
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                filter();
+            }
+
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                filter();
+            }
+
+            private void filter() {
+                memberSorter.setRowFilter(memberSearchField.getText().trim().isEmpty() ? null : RowFilter.regexFilter("(?i)" + memberSearchField.getText()));
+            }
         });
     }
 
@@ -110,14 +159,20 @@ public class EmployeeDashboard {
     private void loadAppointments() {
         if (appointmentsTable == null) return;
         appointmentsTable.setModel(new DefaultTableModel(dbManager.getStaffAppointments(session.getAccountId(), session.hasRole("ADMIN")).toArray(new String[0][]), new String[]{"Appt ID", "Customer", "Time", "Status"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
     }
 
     private void loadMembersList() {
         if (membersTable == null) return;
         membersTable.setModel(new DefaultTableModel(dbManager.getAllAccountsWithRoles().toArray(new String[0][]), new String[]{"ID", "Username", "Name", "Roles", "Status"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
         if (memberSorter != null) memberSorter.setModel((DefaultTableModel) membersTable.getModel());
     }
@@ -134,11 +189,16 @@ public class EmployeeDashboard {
         JPanel p = new JPanel(new GridLayout(4, 2, 5, 5));
         JTextField u = new JTextField(), ps = new JTextField(), n = new JTextField();
         JComboBox<String> r = new JComboBox<>(new String[]{"CUSTOMER", "EMPLOYEE", "ADMIN", "COACH", "TRAINER"});
-        p.add(new JLabel("Username:")); p.add(u); p.add(new JLabel("Password:")); p.add(ps);
-        p.add(new JLabel("Full Name:")); p.add(n); p.add(new JLabel("Role:")); p.add(r);
+        p.add(new JLabel("Username:"));
+        p.add(u);
+        p.add(new JLabel("Password:"));
+        p.add(ps);
+        p.add(new JLabel("Full Name:"));
+        p.add(n);
+        p.add(new JLabel("Role:"));
+        p.add(r);
 
         if (JOptionPane.showConfirmDialog(employeePanel, p, "Register", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            // Arrays mapping Combobox index directly to Database ID
             int[] roleIds = {1, 2, 3, 4, 5};
             if (dbManager.createUser(u.getText(), ps.getText(), n.getText(), roleIds[r.getSelectedIndex()])) {
                 loadMembersList();
@@ -159,9 +219,14 @@ public class EmployeeDashboard {
     private void loadMasterSchedule() {
         if (masterScheduleTable == null) return;
         masterScheduleTable.setModel(new DefaultTableModel(dbManager.getAllClasses().toArray(new String[0][]), new String[]{"ID", "Coach ID", "Type", "Name", "Time"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
     }
 
-    public JPanel getPanel() { return employeePanel; }
+    public JPanel getPanel() {
+        return employeePanel;
+    }
 }

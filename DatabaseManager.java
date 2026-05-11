@@ -23,7 +23,6 @@ public class DatabaseManager {
                 return session;
             }
         } catch (SQLException e) {
-            System.err.println("Auth Error: " + e.getMessage());
         }
         return null;
     }

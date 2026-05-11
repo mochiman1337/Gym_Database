@@ -11,6 +11,7 @@ public class Register {
 
     public interface RegisterListener {
         void onRegistrationComplete();
+
         void onCancel();
     }
 
@@ -53,5 +54,7 @@ public class Register {
         }
     }
 
-    public JPanel getPanel() { return registerPanel; }
+    public JPanel getPanel() {
+        return registerPanel;
+    }
 }

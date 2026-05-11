@@ -10,6 +10,7 @@ public class Login {
 
     public interface LoginListener {
         void onLoginSuccess(UserSession session);
+
         void onNavigateToRegister();
     }
 
@@ -42,12 +43,19 @@ public class Login {
                     return;
                 }
             }
-            idTextField.setText(""); pwTextField.setText("");
+            idTextField.setText("");
+            pwTextField.setText("");
             listener.onLoginSuccess(session);
         } else {
             JOptionPane.showMessageDialog(panel, "Invalid ID or Password.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    public JPanel getPanel() { return panel; }
-    private void createUIComponents() { pwTextField = new JPasswordField(); }
+
+    public JPanel getPanel() {
+        return panel;
+    }
+
+    private void createUIComponents() {
+        pwTextField = new JPasswordField();
+    }
 }

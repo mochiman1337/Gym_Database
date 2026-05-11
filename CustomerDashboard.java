@@ -50,36 +50,53 @@ public class CustomerDashboard {
         }
     }
 
-    private void refreshUI() { loadSchedule(); loadTrainers(); loadHistory(); loadProfile(); }
+    private void refreshUI() {
+        loadSchedule();
+        loadTrainers();
+        loadHistory();
+        loadProfile();
+    }
 
     private void loadTrainers() {
         if (trainerTable == null) return;
         trainerTable.setModel(new DefaultTableModel(dbManager.getAvailableTrainers().toArray(new String[0][]), new String[]{"Trainer ID", "Name"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
     }
 
     private void loadSchedule() {
         scheduleTable.setModel(new DefaultTableModel(dbManager.getAvailableClasses().toArray(new String[0][]), new String[]{"ID", "Type", "Time"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
     }
 
     private void loadHistory() {
         historyTable.setModel(new DefaultTableModel(dbManager.getCustomerBookings(session.getAccountId()).toArray(new String[0][]), new String[]{"ID", "Event", "Time", "Status"}) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
         });
     }
 
     private void loadProfile() {
         String[] info = dbManager.getCustomerProfile(session.getAccountId());
-        nameField.setText(info[0]); addressField.setText(info[1]); contactField.setText(info[2]);
+        nameField.setText(info[0]);
+        addressField.setText(info[1]);
+        contactField.setText(info[2]);
     }
 
     private void handleBook() {
         int r = scheduleTable.getSelectedRow();
         if (r != -1 && dbManager.bookClass(session.getAccountId(), Integer.parseInt((String) scheduleTable.getValueAt(r, 0)))) {
-            JOptionPane.showMessageDialog(customerPanel, "Class Booked!"); loadHistory();
+            JOptionPane.showMessageDialog(customerPanel, "Class Booked!");
+            loadHistory();
         }
     }
 
@@ -88,14 +105,18 @@ public class CustomerDashboard {
         if (r != -1) {
             boolean isTrainer = ((String) historyTable.getValueAt(r, 1)).startsWith("Trainer");
             if (dbManager.cancelBooking(Integer.parseInt((String) historyTable.getValueAt(r, 0)), isTrainer)) {
-                JOptionPane.showMessageDialog(customerPanel, "Cancelled."); loadHistory();
+                JOptionPane.showMessageDialog(customerPanel, "Cancelled.");
+                loadHistory();
             }
         }
     }
 
     private void handleProfileUpdate() {
-        if (dbManager.updateCustomerProfile(session.getAccountId(), nameField.getText(), addressField.getText(), contactField.getText())) JOptionPane.showMessageDialog(customerPanel, "Updated!");
+        if (dbManager.updateCustomerProfile(session.getAccountId(), nameField.getText(), addressField.getText(), contactField.getText()))
+            JOptionPane.showMessageDialog(customerPanel, "Updated!");
     }
 
-    public JPanel getPanel() { return customerPanel; }
+    public JPanel getPanel() {
+        return customerPanel;
+    }
 }
